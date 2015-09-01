@@ -23,5 +23,5 @@ func main() {
 
 func ProcessEvent(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
-	fmt.Fprintln(w, "event processed")
+	fmt.Fprintln(w, vars)
 }
