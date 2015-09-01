@@ -1,10 +1,11 @@
 package main
 
 import (
-	_ "encoding/json"
-	"log"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
+	"io/ioutil"
 
 	"github.com/gorilla/mux"
 )
@@ -22,6 +23,16 @@ func main() {
 }
 
 func ProcessEvent(w http.ResponseWriter, req *http.Request) {
-	form := req.ParseForm()
-	log.Println(w, form)
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		fmt.Println("readall error:", err)
+		return
+	}
+	var runes []interface{}
+	err = json.Unmarshal(body, &runes)
+	if err != nil {
+		fmt.Println("marshal error:", err)
+		return
+	}
+	fmt.Printf("%+v\n", runes)
 }
