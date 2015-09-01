@@ -1,16 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 
-	"github.com/julienschmidt/httprouter"
+	"github.com/gorilla/mux"
 )
 
 func main() {
-	r := httprouter.New()
-	r.POST("/api/sendgrid_event/", ProcessEvent)
+	r := mux.newRouter()
+	r.HandleFunc("/api/sendgrid_event", ProcessEvent).Methods("POST")
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -20,6 +21,7 @@ func main() {
 	http.ListenAndServe(":" + port, r)
 }
 
-func ProcessEvent(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func ProcessEvent(w http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
 	fmt.Fprintln(rw, "event processed")
 }
