@@ -2,7 +2,7 @@ package main
 
 import (
 	_ "encoding/json"
-	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -23,5 +23,5 @@ func main() {
 
 func ProcessEvent(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
-	fmt.Fprintln(w, vars)
+	log.Println(w, vars)
 }
