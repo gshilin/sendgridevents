@@ -22,6 +22,6 @@ func main() {
 }
 
 func ProcessEvent(w http.ResponseWriter, req *http.Request) {
-	vars := mux.Vars(req)
-	log.Println(w, vars)
+	form := req.ParseForm()
+	log.Println(w, form)
 }
