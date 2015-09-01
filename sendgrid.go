@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	_ "encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	r := mux.newRouter()
+	r := mux.NewRouter()
 	r.HandleFunc("/api/sendgrid_event", ProcessEvent).Methods("POST")
 
 	port := os.Getenv("PORT")
@@ -22,6 +22,6 @@ func main() {
 }
 
 func ProcessEvent(w http.ResponseWriter, req *http.Request) {
-	vars := mux.Vars(req)
-	fmt.Fprintln(rw, "event processed")
+	//vars := mux.Vars(req)
+	fmt.Fprintln(w, "event processed")
 }
