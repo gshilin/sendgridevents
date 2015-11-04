@@ -1,21 +1,23 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
-	"net/http"
 	"os"
-	"io/ioutil"
-
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
-  _ "github.com/lib/pq"
+	_ "github.com/lib/pq"
+	"net/http"
+	"io/ioutil"
+	"encoding/json"
 )
 
-var config struct {
-	DB gorm.DB
-}
+var (
+	config struct {
+		DB gorm.DB
+	}
+	err interface{}
+)
 
 func main() {
 	r := mux.NewRouter()
@@ -26,13 +28,13 @@ func main() {
 		port = "8080"
 	}
 
-  var err interface{}
 	config.DB, err = gorm.Open("postgres", os.Getenv("DATABASE_URL"))
 	if err != nil {
-    fmt.Printf("DB connection error: %v\n", err)
+		fmt.Printf("DB connection error: %v\n", err)
 		return
-  }
+	}
 
+	fmt.Println("SERVING on port", port)
 	http.ListenAndServe(":" + port, r)
 }
 
@@ -42,17 +44,23 @@ func ProcessEvent(w http.ResponseWriter, req *http.Request) {
 		fmt.Println("readall error:", err)
 		return
 	}
+	req.Body.Close()
+
 	type Event struct {
-		Email string     `json:email`
-		Timestamp int64  `json:timestamp`
-		Event string     `json:event`
-		Url string       `json:url`
+		ID          uint `gorm:"primary_key"`
+		CreatedAt   time.Time  `gorm:"column:created_at"`
+		UpdatedAt   time.Time  `gorm:"column:updated_at"`
+
+		Email       string `json:"email"`
+		Timestamp   int64  `json:"timestamp" sql:"-"`
+		Happened_at time.Time  `gorm:"column:happened_at"`
+		Event       string `json:"event"`
+		Url         string `json:"url"`
 	}
 	type Events []Event
 
 	events := Events{}
-	err = json.Unmarshal(body, &events)
-	if err != nil {
+	if err := json.Unmarshal(body, &events); err != nil {
 		fmt.Println("marshal error:", err)
 		return
 	}
@@ -63,31 +71,33 @@ func ProcessEvent(w http.ResponseWriter, req *http.Request) {
 		OpenedAt string `gorm:opened_at`
 	}
 	type EmailSubscriptionClick struct {
-		ClickedAt string `gorm:clicked_at`
+		ClickedAt      string `gorm:clicked_at`
 		LastClickedUrl string `gorm:last_clicked_url`
 	}
 
-  for _, event := range events {
+	for _, event := range events {
 		email := event.Email
 		timestamp := event.Timestamp
 		status := event.Event
 
 		if email == "" || timestamp == 0 {
-		  continue
+			continue
 		}
 
 		unixDate := time.Unix(timestamp, 0)
 		occured_at := unixDate.Format(time.RFC3339)
 
-	  switch status {
+		switch status {
 		case "open":
 			config.DB.Debug().Table("email_subscriptions").Where("email = ?", email).UpdateColumn("opened_at", occured_at)
 		case "click":
-      url := event.Url
-      clicked_url := url[0:min(len(url) - 1, 254)]
-			config.DB.Debug().Table("email_subscriptions").Where("email = ?", email).UpdateColumns(map[string]interface{}{"clicked_at": occured_at, "last_clicked_url": clicked_url})
-
+			url := event.Url
+			clicked_url := url[0:min(len(url) - 1, 254)]
+			config.DB.Debug().Table("email_subscriptions").Where("email = ?", email).
+			UpdateColumns(map[string]interface{}{"clicked_at": occured_at, "last_clicked_url": clicked_url})
 		}
+		event.Happened_at = unixDate
+		config.DB.Debug().Table("sendgrid_events").Create(&event)
 	}
 }
 
