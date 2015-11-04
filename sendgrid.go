@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"io/ioutil"
 	"encoding/json"
+	"github.com/yvasiyarov/gorelic"
 )
 
 var (
@@ -20,6 +21,8 @@ var (
 )
 
 func main() {
+	configureNewRelic()
+
 	r := mux.NewRouter()
 	r.HandleFunc("/api/sendgrid_event", ProcessEvent).Methods("POST")
 
@@ -107,4 +110,11 @@ func min(a, b int) int {
 	} else {
 		return b
 	}
+}
+
+func configureNewRelic(){
+	agent := gorelic.NewAgent()
+	agent.Verbose = true
+	agent.NewrelicLicense = os.Getenv("NEW_RELIC_LICENSE_KEY")
+	agent.Run()
 }
