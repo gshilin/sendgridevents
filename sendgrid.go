@@ -116,5 +116,6 @@ func configureNewRelic(){
 	agent := gorelic.NewAgent()
 	agent.Verbose = true
 	agent.NewrelicLicense = os.Getenv("NEW_RELIC_LICENSE_KEY")
+	agent.NewrelicName = "Go sendgrid events handler"
 	agent.Run()
 }
