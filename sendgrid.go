@@ -100,7 +100,7 @@ func ProcessEvent(w http.ResponseWriter, req *http.Request) {
 			UpdateColumns(map[string]interface{}{"clicked_at": occured_at, "last_clicked_url": clicked_url})
 		}
 		event.Happened_at = unixDate
-		config.DB.Debug().Table("sendgrid_events").Create(&event)
+		//		config.DB.Debug().Table("sendgrid_events").Create(&event)
 	}
 }
 
@@ -112,7 +112,7 @@ func min(a, b int) int {
 	}
 }
 
-func configureNewRelic(){
+func configureNewRelic() {
 	agent := gorelic.NewAgent()
 	agent.Verbose = true
 	agent.NewrelicLicense = os.Getenv("NEW_RELIC_LICENSE_KEY")
