@@ -5,25 +5,36 @@ import (
 	"time"
 	"os"
 	"github.com/gorilla/mux"
-	"github.com/jinzhu/gorm"
 	_ "github.com/lib/pq"
 	"net/http"
 	"io/ioutil"
 	"encoding/json"
 	"github.com/yvasiyarov/gorelic"
+	"database/sql"
+	"log"
+	_ "github.com/joho/godotenv/autoload"
 )
 
 var (
-	config struct {
-		DB gorm.DB
-	}
+	db *sql.DB
+	clickPreparedStmt, openPreparedStmt *sql.Stmt
 	err interface{}
 )
 
 func main() {
+	// prepare NewRelic
 	configureNewRelic()
 
+	// prepare DB
+	db, err = prepareDB()
+	if err != nil {
+		return
+	}
+
+	defer closeDB(db)
+
 	r := mux.NewRouter()
+	// We handle only one request for now...
 	r.HandleFunc("/api/sendgrid_event", ProcessEvent).Methods("POST")
 
 	port := os.Getenv("PORT")
@@ -31,14 +42,38 @@ func main() {
 		port = "8080"
 	}
 
-	config.DB, err = gorm.Open("postgres", os.Getenv("DATABASE_URL"))
+	fmt.Println("SERVING on port", port)
+	http.ListenAndServe(":" + port, r)
+}
+
+func prepareDB() (db *sql.DB, err error) {
+	db, err = sql.Open("postgres", os.Getenv("DATABASE_URL"))
 	if err != nil {
-		fmt.Printf("DB connection error: %v\n", err)
+		log.Fatalf("DB connection error: %v\n", err)
+		return
+	}
+	err = db.Ping() // really connect to db
+	if err != nil {
+		log.Fatalf("DB real connection error: %v\n", err)
 		return
 	}
 
-	fmt.Println("SERVING on port", port)
-	http.ListenAndServe(":" + port, r)
+	openPreparedStmt, err = db.Prepare("UPDATE email_subscriptions SET opened_at = $1 WHERE email = $2")
+	if err != nil {
+		log.Fatalf("Unable to prepare open statement: %v\n", err)
+	}
+	clickPreparedStmt, err = db.Prepare("UPDATE email_subscriptions SET (clicked_at, last_clicked_url) = ($1, $2) WHERE email = $3")
+	if err != nil {
+		log.Fatalf("Unable to prepare click statement: %v\n", err)
+	}
+	return
+}
+
+func closeDB(db *sql.DB) {
+	fmt.Println("Closing DB")
+	openPreparedStmt.Close()
+	clickPreparedStmt.Close()
+	db.Close()
 }
 
 func ProcessEvent(w http.ResponseWriter, req *http.Request) {
@@ -92,13 +127,19 @@ func ProcessEvent(w http.ResponseWriter, req *http.Request) {
 
 		switch status {
 		case "open":
-			config.DB.Debug().Table("email_subscriptions").Where("email = ?", email).UpdateColumn("opened_at", occured_at)
+			_, err = openPreparedStmt.Exec(occured_at, email)
+			log.Println("Open :", email)
 		case "click":
 			url := event.Url
 			clicked_url := url[0:min(len(url) - 1, 254)]
-			config.DB.Debug().Table("email_subscriptions").Where("email = ?", email).
-			UpdateColumns(map[string]interface{}{"clicked_at": occured_at, "last_clicked_url": clicked_url})
+			_, err = clickPreparedStmt.Exec(occured_at, clicked_url, email)
+			log.Println("Click:", email)
 		}
+		if err != nil {
+			fmt.Println("update error:", err)
+			return
+		}
+
 		event.Happened_at = unixDate
 		//		config.DB.Debug().Table("sendgrid_events").Create(&event)
 	}
