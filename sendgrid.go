@@ -77,6 +77,8 @@ func closeDB(db *sql.DB) {
 }
 
 func ProcessEvent(w http.ResponseWriter, req *http.Request) {
+	return
+
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		fmt.Println("readall error:", err)
