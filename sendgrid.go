@@ -15,10 +15,26 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
+type Event struct {
+	ID          uint
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+
+	Email       string
+	Timestamp   int64
+	Happened_at time.Time
+	Event       string
+	Url         string
+}
+
+type Events []Event
+
 var (
 	db *sql.DB
 	clickPreparedStmt, openPreparedStmt *sql.Stmt
 	err interface{}
+	chanDB chan (Event)
+	quitDB chan (int)
 )
 
 func main() {
@@ -33,9 +49,13 @@ func main() {
 
 	defer closeDB(db)
 
+	chanDB = make(chan Event, 100)
+	quitDB = make(chan int)
+	go updateDB()
+
 	r := mux.NewRouter()
 	// We handle only one request for now...
-	r.HandleFunc("/api/sendgrid_event", ProcessEvent).Methods("POST")
+	r.HandleFunc("/api/sendgrid_event", processEvent).Methods("POST")
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -66,6 +86,7 @@ func prepareDB() (db *sql.DB, err error) {
 	if err != nil {
 		log.Fatalf("Unable to prepare click statement: %v\n", err)
 	}
+
 	return
 }
 
@@ -74,11 +95,10 @@ func closeDB(db *sql.DB) {
 	openPreparedStmt.Close()
 	clickPreparedStmt.Close()
 	db.Close()
+	quitDB <- 0
 }
 
-func ProcessEvent(w http.ResponseWriter, req *http.Request) {
-	return
-
+func processEvent(w http.ResponseWriter, req *http.Request) {
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		fmt.Println("readall error:", err)
@@ -86,64 +106,57 @@ func ProcessEvent(w http.ResponseWriter, req *http.Request) {
 	}
 	req.Body.Close()
 
-	type Event struct {
-		ID          uint `gorm:"primary_key"`
-		CreatedAt   time.Time  `gorm:"column:created_at"`
-		UpdatedAt   time.Time  `gorm:"column:updated_at"`
-
-		Email       string `json:"email"`
-		Timestamp   int64  `json:"timestamp" sql:"-"`
-		Happened_at time.Time  `gorm:"column:happened_at"`
-		Event       string `json:"event"`
-		Url         string `json:"url"`
-	}
-	type Events []Event
-
 	events := Events{}
 	if err := json.Unmarshal(body, &events); err != nil {
 		fmt.Println("marshal error:", err)
 		return
 	}
 
-	type EmailSubscription struct {
-	}
-	type EmailSubscriptionOpen struct {
-		OpenedAt string `gorm:opened_at`
-	}
-	type EmailSubscriptionClick struct {
-		ClickedAt      string `gorm:clicked_at`
-		LastClickedUrl string `gorm:last_clicked_url`
-	}
-
 	for _, event := range events {
-		email := event.Email
-		timestamp := event.Timestamp
-		status := event.Event
+		chanDB <- event
+	}
+}
 
-		if email == "" || timestamp == 0 {
-			continue
-		}
-
-		unixDate := time.Unix(timestamp, 0)
-		occured_at := unixDate.Format(time.RFC3339)
-
-		switch status {
-		case "open":
-			_, err = openPreparedStmt.Exec(occured_at, email)
-			log.Println("Open :", email)
-		case "click":
-			url := event.Url
-			clicked_url := url[0:min(len(url) - 1, 254)]
-			_, err = clickPreparedStmt.Exec(occured_at, clicked_url, email)
-			log.Println("Click:", email)
-		}
-		if err != nil {
-			fmt.Println("update error:", err)
+func updateDB() {
+	for {
+		select {
+		case <-quitDB:
 			return
-		}
+		case event := <-chanDB:
+			email := event.Email
+			timestamp := event.Timestamp
 
-		event.Happened_at = unixDate
+			if email == "" || timestamp == 0 {
+				return
+			}
+
+			unixDate := time.Unix(timestamp, 0)
+			occured_at := unixDate.Format(time.RFC3339)
+
+			switch event.Event {
+			case "open":
+				_, err = openPreparedStmt.Exec(occured_at, email)
+				if err != nil {
+					log.Fatalf("Unable to register open event: %v\n", err)
+				}
+				log.Println("Open :", email)
+			case "click":
+				url := event.Url
+				clicked_url := url[0:min(len(url) - 1, 254)]
+				_, err = clickPreparedStmt.Exec(occured_at, clicked_url, email)
+				if err != nil {
+					log.Fatalf("Unable to register click event: %v\n", err)
+				}
+				log.Println("Click:", email)
+			}
+			if err != nil {
+				fmt.Println("update error:", err)
+				return
+			}
+
+			event.Happened_at = unixDate
 		//		config.DB.Debug().Table("sendgrid_events").Create(&event)
+		}
 	}
 }
 
