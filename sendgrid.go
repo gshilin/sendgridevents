@@ -127,7 +127,7 @@ func updateDB() {
 
 			switch event.Event {
 			case "open":
-				q := fmt.Sprintf("UPDATE email_subscriptions SET opened_at = %s WHERE email = %s", occured_at, email)
+				q := fmt.Sprintf("UPDATE email_subscriptions SET opened_at = '%s' WHERE email = '%s'", occured_at, email)
 				_, err = db.Exec(q)
 				if err != nil {
 					log.Fatalf("Unable to register open event: %v\n", err)
@@ -135,7 +135,7 @@ func updateDB() {
 			case "click":
 				url := event.Url
 				clicked_url := url[0:min(len(url) - 1, 254)]
-				q := fmt.Sprintf("UPDATE email_subscriptions SET (clicked_at, last_clicked_url) = (%s, %s) WHERE email = %s", occured_at, clicked_url, email)
+				q := fmt.Sprintf("UPDATE email_subscriptions SET (clicked_at, last_clicked_url) = ('%s', '%s') WHERE email = '%s'", occured_at, clicked_url, email)
 				_, err = db.Exec(q)
 				if err != nil {
 					log.Fatalf("Unable to register click event: %v\n", err)
