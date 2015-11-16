@@ -49,7 +49,7 @@ func main() {
 
 	defer closeDB(db)
 
-	chanDB = make(chan Event, 100)
+	chanDB = make(chan Event, 1000)
 	quitDB = make(chan int)
 	go updateDB()
 
@@ -139,7 +139,7 @@ func updateDB() {
 				if err != nil {
 					log.Fatalf("Unable to register open event: %v\n", err)
 				}
-				log.Println("Open :", email)
+				// log.Println("Open :", email)
 			case "click":
 				url := event.Url
 				clicked_url := url[0:min(len(url) - 1, 254)]
@@ -147,7 +147,7 @@ func updateDB() {
 				if err != nil {
 					log.Fatalf("Unable to register click event: %v\n", err)
 				}
-				log.Println("Click:", email)
+				// log.Println("Click:", email)
 			}
 			if err != nil {
 				fmt.Println("update error:", err)
