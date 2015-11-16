@@ -52,6 +52,8 @@ func main() {
 	chanDB = make(chan Event, 1000)
 	quitDB = make(chan int)
 	go updateDB()
+	go updateDB()
+	go updateDB()
 
 	r := mux.NewRouter()
 	// We handle only one request for now...
