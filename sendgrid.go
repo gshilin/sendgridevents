@@ -31,11 +31,13 @@ type Events []Event
 
 var (
 	db *sql.DB
-	clickPreparedStmt, openPreparedStmt *sql.Stmt
 	err interface{}
 	chanDB chan (Event)
 	quitDB chan (int)
 )
+
+const numOfUpdates = 20
+const numOfEventsBuffer = 100
 
 func main() {
 	// prepare NewRelic
@@ -49,28 +51,11 @@ func main() {
 
 	defer closeDB(db)
 
-	chanDB = make(chan Event, 1000)
+	chanDB = make(chan Event, numOfEventsBuffer)
 	quitDB = make(chan int)
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
-	go updateDB()
+	for i := 0; i < numOfUpdates; i++ {
+		go updateDB()
+	}
 
 	r := mux.NewRouter()
 	// We handle only one request for now...
@@ -97,24 +82,12 @@ func prepareDB() (db *sql.DB, err error) {
 		return
 	}
 
-	openPreparedStmt, err = db.Prepare("UPDATE email_subscriptions SET opened_at = $1 WHERE email = $2")
-	if err != nil {
-		log.Fatalf("Unable to prepare open statement: %v\n", err)
-	}
-	clickPreparedStmt, err = db.Prepare("UPDATE email_subscriptions SET (clicked_at, last_clicked_url) = ($1, $2) WHERE email = $3")
-	if err != nil {
-		log.Fatalf("Unable to prepare click statement: %v\n", err)
-	}
-
 	return
 }
 
 func closeDB(db *sql.DB) {
-	fmt.Println("Closing DB")
-	openPreparedStmt.Close()
-	clickPreparedStmt.Close()
-	db.Close()
 	quitDB <- 0
+	db.Close()
 }
 
 func processEvent(w http.ResponseWriter, req *http.Request) {
@@ -154,19 +127,19 @@ func updateDB() {
 
 			switch event.Event {
 			case "open":
-				_, err = openPreparedStmt.Exec(occured_at, email)
+				q := fmt.Sprintf("UPDATE email_subscriptions SET opened_at = %s WHERE email = %s", occured_at, email)
+				_, err = dv.Exec(q)
 				if err != nil {
 					log.Fatalf("Unable to register open event: %v\n", err)
 				}
-				// log.Println("Open :", email)
 			case "click":
 				url := event.Url
 				clicked_url := url[0:min(len(url) - 1, 254)]
-				_, err = clickPreparedStmt.Exec(occured_at, clicked_url, email)
+				q := fmt.Sprintf("UPDATE email_subscriptions SET (clicked_at, last_clicked_url) = (%s, %s) WHERE email = %s", occured_at, clicked_url, email)
+				_, err = db.Exec(q)
 				if err != nil {
 					log.Fatalf("Unable to register click event: %v\n", err)
 				}
-				// log.Println("Click:", email)
 			}
 			if err != nil {
 				fmt.Println("update error:", err)
@@ -174,7 +147,7 @@ func updateDB() {
 			}
 
 			event.Happened_at = unixDate
-		//		config.DB.Debug().Table("sendgrid_events").Create(&event)
+		//config.DB.Debug().Table("sendgrid_events").Create(&event)
 		}
 	}
 }
