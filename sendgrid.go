@@ -128,7 +128,7 @@ func updateDB() {
 			switch event.Event {
 			case "open":
 				q := fmt.Sprintf("UPDATE email_subscriptions SET opened_at = %s WHERE email = %s", occured_at, email)
-				_, err = dv.Exec(q)
+				_, err = db.Exec(q)
 				if err != nil {
 					log.Fatalf("Unable to register open event: %v\n", err)
 				}
