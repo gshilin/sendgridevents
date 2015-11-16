@@ -61,6 +61,16 @@ func main() {
 	go updateDB()
 	go updateDB()
 	go updateDB()
+	go updateDB()
+	go updateDB()
+	go updateDB()
+	go updateDB()
+	go updateDB()
+	go updateDB()
+	go updateDB()
+	go updateDB()
+	go updateDB()
+	go updateDB()
 
 	r := mux.NewRouter()
 	// We handle only one request for now...
