@@ -149,7 +149,6 @@ func updateDB() {
 			now := time.Now().Format(time.RFC3339)
 			q := fmt.Sprintf("INSERT INTO sendgrid_events (created_at, updated_at, email, happened_at, event, url) VALUES ('%s', '%s', '%s', '%s', '%s', '%s')",
 				now, now, email, occured_at, event.Event, url)
-			fmt.Println("REQ:", q)
 			_, err = db.Exec(q)
 			if err != nil {
 				log.Fatalf("Unable to sendgrid_event: %v\n", err)
