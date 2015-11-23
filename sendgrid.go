@@ -124,6 +124,7 @@ func updateDB() {
 
 			unixDate := time.Unix(timestamp, 0)
 			occured_at := unixDate.Format(time.RFC3339)
+			url := event.Url
 
 			switch event.Event {
 			case "open":
@@ -133,7 +134,6 @@ func updateDB() {
 					log.Fatalf("Unable to register open event: %v\n", err)
 				}
 			case "click":
-				url := event.Url
 				clicked_url := url[0:min(len(url) - 1, 254)]
 				q := fmt.Sprintf("UPDATE email_subscriptions SET (clicked_at, last_clicked_url) = ('%s', '%s') WHERE email = '%s'", occured_at, clicked_url, email)
 				_, err = db.Exec(q)
@@ -146,8 +146,14 @@ func updateDB() {
 				return
 			}
 
-			event.Happened_at = unixDate
-		//config.DB.Debug().Table("sendgrid_events").Create(&event)
+			now := time.Now().Format(time.RFC3339)
+			q := fmt.Sprintf("INSERT INTO sendgrid_events (created_at, updated_at, email, happened_at, event, url) VALUES ('%s', '%s', '%s', '%s', '%s', '%s')",
+				now, now, email, occured_at, event.Event, url)
+			fmt.Println("REQ:", q)
+			_, err = db.Exec(q)
+			if err != nil {
+				log.Fatalf("Unable to sendgrid_event: %v\n", err)
+			}
 		}
 	}
 }
