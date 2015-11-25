@@ -20,11 +20,16 @@ type Event struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 
+	Event       string
 	Email       string
+	Category    string `json:"category"`
 	Timestamp   int64
 	Happened_at time.Time
-	Event       string
 	Url         string
+	SmtpId      string `json:"smtp-id"`
+	SgMessageId string `json:"sg_message_id"`
+	IP          string `json:"ip"`
+	UserAgent   string `json:"useragent"`
 }
 
 type Events []Event
@@ -147,8 +152,9 @@ func updateDB() {
 			}
 
 			now := time.Now().Format(time.RFC3339)
-			q := fmt.Sprintf("INSERT INTO sendgrid_events (created_at, updated_at, email, happened_at, event, url) VALUES ('%s', '%s', '%s', '%s', '%s', '%s')",
-				now, now, email, occured_at, event.Event, url)
+			q := fmt.Sprintf(
+				"INSERT INTO sendgrid_events (created_at, updated_at, email, category, smtp_id, sg_message_id, ip, useragent, happened_at, event, url) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')",
+				now, now, email, event.Category, event.SmtpId, event.SgMessageId, event.IP, event.UserAgent, occured_at, event.Event, url)
 			_, err = db.Exec(q)
 			if err != nil {
 				log.Fatalf("Unable to sendgrid_event: %v\n", err)
