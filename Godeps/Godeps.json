@@ -3,15 +3,11 @@
 	"GoVersion": "go1.5",
 	"Deps": [
 		{
-			"ImportPath": "github.com/gorilla/context",
-			"Rev": "215affda49addc4c8ef7e2534915df2c8c35c6cd"
-		},
-		{
 			"ImportPath": "github.com/gorilla/mux",
 			"Rev": "f8220e087da2fc83d083bfc0289ed7f9db3536bd"
 		},
 		{
-			"ImportPath": "github.com/joho/godotenv",
+			"ImportPath": "github.com/joho/godotenv/autoload",
 			"Comment": "v1-8-g443e926",
 			"Rev": "443e926da0d793d3b3f32118b1e4ba52ada26503"
 		},
@@ -21,17 +17,9 @@
 			"Rev": "b269bd035a727d6c1081f76e7a239a1b00674c40"
 		},
 		{
-			"ImportPath": "github.com/yvasiyarov/go-metrics",
-			"Rev": "c25f46c4b94079672242ec48a545e7ca9ebe3aec"
-		},
-		{
 			"ImportPath": "github.com/yvasiyarov/gorelic",
 			"Comment": "v0.0.6-38-g899fe5e",
 			"Rev": "899fe5e1be7138f2440c28e77532f0635c1249f1"
-		},
-		{
-			"ImportPath": "github.com/yvasiyarov/newrelic_platform_go",
-			"Rev": "db03d6dfd965ebc22dbfd910567c641b326ff055"
 		}
 	]
 }

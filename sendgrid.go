@@ -1,24 +1,24 @@
 package main
 
 import (
-	"fmt"
-	"time"
-	"os"
-	"github.com/gorilla/mux"
-	_ "github.com/lib/pq"
-	"net/http"
-	"io/ioutil"
-	"encoding/json"
-	"github.com/yvasiyarov/gorelic"
 	"database/sql"
+	"encoding/json"
+	"fmt"
+	"github.com/gshilin/sendgridevents/Godeps/_workspace/src/github.com/gorilla/mux"
+	_ "github.com/gshilin/sendgridevents/Godeps/_workspace/src/github.com/joho/godotenv/autoload"
+	_ "github.com/gshilin/sendgridevents/Godeps/_workspace/src/github.com/lib/pq"
+	"github.com/gshilin/sendgridevents/Godeps/_workspace/src/github.com/yvasiyarov/gorelic"
+	"io/ioutil"
 	"log"
-	_ "github.com/joho/godotenv/autoload"
+	"net/http"
+	"os"
+	"time"
 )
 
 type Event struct {
-	ID          uint
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID        uint
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	Event       string
 	Email       string
@@ -35,8 +35,9 @@ type Event struct {
 type Events []Event
 
 var (
-	db *sql.DB
-	err interface{}
+	db     *sql.DB
+	err    interface{}
+	res    sql.Result
 	chanDB chan (Event)
 	quitDB chan (int)
 )
@@ -72,7 +73,7 @@ func main() {
 	}
 
 	fmt.Println("SERVING on port", port)
-	http.ListenAndServe(":" + port, r)
+	http.ListenAndServe(":"+port, r)
 }
 
 func prepareDB() (db *sql.DB, err error) {
@@ -128,43 +129,44 @@ func updateDB() {
 			}
 
 			unixDate := time.Unix(timestamp, 0)
-			occured_at := unixDate.Format(time.RFC3339)
+			occurred_at := unixDate.Format(time.RFC3339)
 			url := event.Url
 
 			switch event.Event {
 			case "open":
-				q := fmt.Sprintf("UPDATE email_subscriptions SET opened_at = '%s' WHERE email = '%s'", occured_at, email)
+				q := fmt.Sprintf("UPDATE email_subscriptions SET opened_at = '%s' WHERE email = '%s'", occurred_at, email)
 				_, err = db.Exec(q)
 				if err != nil {
 					log.Fatalf("Unable to register open event: %v\n", err)
 				}
 			case "click":
-				clicked_url := url[0:min(len(url) - 1, 254)]
-				q := fmt.Sprintf("UPDATE email_subscriptions SET (clicked_at, last_clicked_url) = ('%s', '%s') WHERE email = '%s'", occured_at, clicked_url, email)
+				clicked_url := url[0:min(len(url)-1, 254)]
+				q := fmt.Sprintf("UPDATE email_subscriptions SET (clicked_at, last_clicked_url) = ('%s', '%s') WHERE email = '%s'", occurred_at, clicked_url, email)
 				_, err = db.Exec(q)
 				if err != nil {
 					log.Fatalf("Unable to register click event: %v\n", err)
 				}
 			}
-			if err != nil {
-				fmt.Println("update error:", err)
-				return
-			}
 
 			now := time.Now().Format(time.RFC3339)
 			q := fmt.Sprintf(
 				"INSERT INTO sendgrid_events (created_at, updated_at, email, category, smtp_id, sg_message_id, ip, useragent, happened_at, event, url) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')",
-				now, now, email, event.Category, event.SmtpId, event.SgMessageId, event.IP, event.UserAgent, occured_at, event.Event, url)
-			_, err = db.Exec(q)
+				now, now, email, event.Category, event.SmtpId, event.SgMessageId, event.IP, event.UserAgent, occurred_at, event.Event, url)
+			res, err = db.Exec(q)
 			if err != nil {
 				log.Fatalf("Unable to sendgrid_event: %v\n", err)
 			}
+			rowCount, err := res.RowsAffected()
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("inserted %d rows", rowCount)
 		}
 	}
 }
 
 func min(a, b int) int {
-	if (a <= b) {
+	if a <= b {
 		return a
 	} else {
 		return b
