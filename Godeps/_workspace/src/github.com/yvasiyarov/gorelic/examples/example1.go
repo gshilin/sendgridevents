@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"github.com/gshilin/sendgridevents/Godeps/_workspace/src/github.com/yvasiyarov/gorelic"
+	"github.com/yvasiyarov/gorelic"
 	"log"
 	"math/rand"
 	"runtime"

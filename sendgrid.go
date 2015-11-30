@@ -4,10 +4,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/gshilin/sendgridevents/Godeps/_workspace/src/github.com/gorilla/mux"
-	_ "github.com/gshilin/sendgridevents/Godeps/_workspace/src/github.com/joho/godotenv/autoload"
-	_ "github.com/gshilin/sendgridevents/Godeps/_workspace/src/github.com/lib/pq"
-	"github.com/gshilin/sendgridevents/Godeps/_workspace/src/github.com/yvasiyarov/gorelic"
+	"github.com/gorilla/mux"
+	_ "github.com/joho/godotenv/autoload"
+	_ "github.com/lib/pq"
+	"github.com/yvasiyarov/gorelic"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -16,9 +16,9 @@ import (
 )
 
 type Event struct {
-	ID          uint
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID        uint
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	Event       string
 	Email       string
@@ -35,12 +35,12 @@ type Event struct {
 type Events []Event
 
 var (
-	db     *sql.DB
-	err    interface{}
-	res sql.Result
+	db                                    *sql.DB
+	err                                   interface{}
+	res                                   sql.Result
 	open_event_update, click_event_update *sql.Stmt
-	chanDB chan (Event)
-	quitDB chan (int)
+	chanDB                                chan (Event)
+	quitDB                                chan (int)
 )
 
 const numOfUpdates = 20
@@ -74,7 +74,7 @@ func main() {
 	}
 
 	fmt.Println("SERVING on port", port)
-	http.ListenAndServe(":" + port, r)
+	http.ListenAndServe(":"+port, r)
 }
 
 func prepareDB() (db *sql.DB, err error) {
@@ -157,7 +157,7 @@ func updateDB() {
 					log.Fatalf("Unable to register open event: %v\n", err)
 				}
 			case "click":
-				clicked_url := url[0:min(len(url) - 1, 254)]
+				clicked_url := url[0:min(len(url)-1, 254)]
 				// q := fmt.Sprintf("UPDATE email_subscriptions SET (clicked_at, last_clicked_url) = ('%s', '%s') WHERE email = '%s'", occurred_at, clicked_url, email)
 				_, err = click_event_update.Exec(occurred_at, clicked_url, email)
 				if err != nil {

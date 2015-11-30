@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gshilin/sendgridevents/Godeps/_workspace/src/github.com/lib/pq/oid"
+	"github.com/lib/pq/oid"
 )
 
 func TestScanTimestamp(t *testing.T) {
