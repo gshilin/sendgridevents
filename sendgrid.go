@@ -16,9 +16,9 @@ import (
 )
 
 type Event struct {
-	ID        uint
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID          uint
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 
 	Event       string
 	Email       string
@@ -37,7 +37,8 @@ type Events []Event
 var (
 	db     *sql.DB
 	err    interface{}
-	res    sql.Result
+	res sql.Result
+	open_event_update, click_event_update *sql.Stmt
 	chanDB chan (Event)
 	quitDB chan (int)
 )
@@ -73,7 +74,7 @@ func main() {
 	}
 
 	fmt.Println("SERVING on port", port)
-	http.ListenAndServe(":"+port, r)
+	http.ListenAndServe(":" + port, r)
 }
 
 func prepareDB() (db *sql.DB, err error) {
@@ -88,11 +89,27 @@ func prepareDB() (db *sql.DB, err error) {
 		return
 	}
 
+	db.SetMaxOpenConns(numOfUpdates)
+	db.SetMaxIdleConns(numOfUpdates)
+
+	open_event_update, err = db.Prepare("UPDATE email_subscriptions SET opened_at = $1 WHERE email = $2")
+	if err != nil {
+		log.Fatalf("Prepare open_event_update error: %v\n", err)
+		return
+	}
+	click_event_update, err = db.Prepare("UPDATE email_subscriptions SET (clicked_at, last_clicked_url) = ($1, $2) WHERE email = $3")
+	if err != nil {
+		log.Fatalf("Prepare click_event_update error: %v\n", err)
+		return
+	}
+
 	return
 }
 
 func closeDB(db *sql.DB) {
 	quitDB <- 0
+	open_event_update.Close()
+	click_event_update.Close()
 	db.Close()
 }
 
@@ -134,15 +151,15 @@ func updateDB() {
 
 			switch event.Event {
 			case "open":
-				q := fmt.Sprintf("UPDATE email_subscriptions SET opened_at = '%s' WHERE email = '%s'", occurred_at, email)
-				_, err = db.Exec(q)
+				// q := fmt.Sprintf("UPDATE email_subscriptions SET opened_at = '%s' WHERE email = '%s'", occurred_at, email)
+				_, err = open_event_update.Exec(occurred_at, email)
 				if err != nil {
 					log.Fatalf("Unable to register open event: %v\n", err)
 				}
 			case "click":
-				clicked_url := url[0:min(len(url)-1, 254)]
-				q := fmt.Sprintf("UPDATE email_subscriptions SET (clicked_at, last_clicked_url) = ('%s', '%s') WHERE email = '%s'", occurred_at, clicked_url, email)
-				_, err = db.Exec(q)
+				clicked_url := url[0:min(len(url) - 1, 254)]
+				// q := fmt.Sprintf("UPDATE email_subscriptions SET (clicked_at, last_clicked_url) = ('%s', '%s') WHERE email = '%s'", occurred_at, clicked_url, email)
+				_, err = click_event_update.Exec(occurred_at, clicked_url, email)
 				if err != nil {
 					log.Fatalf("Unable to register click event: %v\n", err)
 				}
