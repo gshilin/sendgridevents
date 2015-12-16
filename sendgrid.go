@@ -154,7 +154,7 @@ func updateDB() {
 
 			now := time.Now().Format(time.RFC3339)
 			q := fmt.Sprintf(
-				"INSERT INTO sendgrid_events (created_at, updated_at, email, category, uniq_id, smtp_id, sg_message_id, ip, useragent, happened_at, event, url) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')",
+				"INSERT INTO sendgrid_events (created_at, updated_at, email, category, uniq_id, smtp_id, sg_message_id, ip, useragent, happened_at, event, url) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')",
 				now, now, email, event.Category, event.UniqId, event.SmtpId, event.SgMessageId, event.IP, event.UserAgent, occurred_at, event.Event, url)
 			res, err = db.Exec(q)
 			if err != nil {
