@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"reflect"
 	"strings"
@@ -133,6 +134,95 @@ func TestOpenURL(t *testing.T) {
 	}
 	testURL("postgres://")
 	testURL("postgresql://")
+}
+
+const pgpass_file = "/tmp/pqgotest_pgpass"
+
+func TestPgpass(t *testing.T) {
+	if os.Getenv("TRAVIS") != "true" {
+		t.Skip("not running under Travis, skipping pgpass tests")
+	}
+
+	testAssert := func(conninfo string, expected string, reason string) {
+		conn, err := openTestConnConninfo(conninfo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+
+		txn, err := conn.Begin()
+		if err != nil {
+			if expected != "fail" {
+				t.Fatalf(reason, err)
+			}
+			return
+		}
+		rows, err := txn.Query("SELECT USER")
+		if err != nil {
+			txn.Rollback()
+			rows.Close()
+			if expected != "fail" {
+				t.Fatalf(reason, err)
+			}
+		} else {
+			if expected != "ok" {
+				t.Fatalf(reason, err)
+			}
+		}
+		txn.Rollback()
+	}
+	testAssert("", "ok", "missing .pgpass, unexpected error %#v")
+	os.Setenv("PGPASSFILE", pgpass_file)
+	testAssert("host=/tmp", "fail", ", unexpected error %#v")
+	os.Remove(pgpass_file)
+	pgpass, err := os.OpenFile(pgpass_file, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		t.Fatalf("Unexpected error writing pgpass file %#v", err)
+	}
+	_, err = pgpass.WriteString(`# comment
+server:5432:some_db:some_user:pass_A
+*:5432:some_db:some_user:pass_B
+localhost:*:*:*:pass_C
+*:*:*:*:pass_fallback
+`)
+	if err != nil {
+		t.Fatalf("Unexpected error writing pgpass file %#v", err)
+	}
+	pgpass.Close()
+
+	assertPassword := func(extra values, expected string) {
+		o := &values{
+			"host":               "localhost",
+			"sslmode":            "disable",
+			"connect_timeout":    "20",
+			"user":               "majid",
+			"port":               "5432",
+			"extra_float_digits": "2",
+			"dbname":             "pqgotest",
+			"client_encoding":    "UTF8",
+			"datestyle":          "ISO, MDY",
+		}
+		for k, v := range extra {
+			(*o)[k] = v
+		}
+		(&conn{}).handlePgpass(*o)
+		if o.Get("password") != expected {
+			t.Fatalf("For %v expected %s got %s", extra, expected, o.Get("password"))
+		}
+	}
+	// wrong permissions for the pgpass file means it should be ignored
+	assertPassword(values{"host": "example.com", "user": "foo"}, "")
+	// fix the permissions and check if it has taken effect
+	os.Chmod(pgpass_file, 0600)
+	assertPassword(values{"host": "server", "dbname": "some_db", "user": "some_user"}, "pass_A")
+	assertPassword(values{"host": "example.com", "user": "foo"}, "pass_fallback")
+	assertPassword(values{"host": "example.com", "dbname": "some_db", "user": "some_user"}, "pass_B")
+	// localhost also matches the default "" and UNIX sockets
+	assertPassword(values{"host": "", "user": "some_user"}, "pass_C")
+	assertPassword(values{"host": "/tmp", "user": "some_user"}, "pass_C")
+	// cleanup
+	os.Remove(pgpass_file)
+	os.Setenv("PGPASSFILE", "")
 }
 
 func TestExec(t *testing.T) {
@@ -296,9 +386,15 @@ func TestEmptyQuery(t *testing.T) {
 	db := openTestConn(t)
 	defer db.Close()
 
-	_, err := db.Exec("")
+	res, err := db.Exec("")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if _, err := res.RowsAffected(); err != errNoRowsAffected {
+		t.Fatalf("expected %s, got %v", errNoRowsAffected, err)
+	}
+	if _, err := res.LastInsertId(); err != errNoLastInsertId {
+		t.Fatalf("expected %s, got %v", errNoLastInsertId, err)
 	}
 	rows, err := db.Query("")
 	if err != nil {
@@ -322,9 +418,15 @@ func TestEmptyQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = stmt.Exec()
+	res, err = stmt.Exec()
 	if err != nil {
 		t.Fatal(err)
+	}
+	if _, err := res.RowsAffected(); err != errNoRowsAffected {
+		t.Fatalf("expected %s, got %v", errNoRowsAffected, err)
+	}
+	if _, err := res.LastInsertId(); err != errNoLastInsertId {
+		t.Fatalf("expected %s, got %v", errNoLastInsertId, err)
 	}
 	rows, err = stmt.Query()
 	if err != nil {
@@ -343,6 +445,59 @@ func TestEmptyQuery(t *testing.T) {
 	if rows.Err() != nil {
 		t.Fatal(rows.Err())
 	}
+}
+
+// Test that rows.Columns() is correct even if there are no result rows.
+func TestEmptyResultSetColumns(t *testing.T) {
+	db := openTestConn(t)
+	defer db.Close()
+
+	rows, err := db.Query("SELECT 1 AS a, text 'bar' AS bar WHERE FALSE")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols, err := rows.Columns()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cols) != 2 {
+		t.Fatalf("unexpected number of columns %d in response to an empty query", len(cols))
+	}
+	if rows.Next() {
+		t.Fatal("unexpected row")
+	}
+	if rows.Err() != nil {
+		t.Fatal(rows.Err())
+	}
+	if cols[0] != "a" || cols[1] != "bar" {
+		t.Fatalf("unexpected Columns result %v", cols)
+	}
+
+	stmt, err := db.Prepare("SELECT $1::int AS a, text 'bar' AS bar WHERE FALSE")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err = stmt.Query(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols, err = rows.Columns()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cols) != 2 {
+		t.Fatalf("unexpected number of columns %d in response to an empty query", len(cols))
+	}
+	if rows.Next() {
+		t.Fatal("unexpected row")
+	}
+	if rows.Err() != nil {
+		t.Fatal(rows.Err())
+	}
+	if cols[0] != "a" || cols[1] != "bar" {
+		t.Fatalf("unexpected Columns result %v", cols)
+	}
+
 }
 
 func TestEncodeDecode(t *testing.T) {
@@ -508,6 +663,40 @@ func TestBadConn(t *testing.T) {
 	}
 	if !cn.bad {
 		t.Fatalf("expected cn.bad")
+	}
+}
+
+// TestCloseBadConn tests that the underlying connection can be closed with
+// Close after an error.
+func TestCloseBadConn(t *testing.T) {
+	nc, err := net.Dial("tcp", "localhost:5432")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cn := conn{c: nc}
+	func() {
+		defer cn.errRecover(&err)
+		panic(io.EOF)
+	}()
+	// Verify we can write before closing.
+	if _, err := nc.Write(nil); err != nil {
+		t.Fatal(err)
+	}
+	// First close should close the connection.
+	if err := cn.Close(); err != nil {
+		t.Fatal(err)
+	}
+	// Verify write after closing fails.
+	if _, err := nc.Write(nil); err == nil {
+		t.Fatal("expected error")
+	} else if !strings.Contains(err.Error(), "use of closed network connection") {
+		t.Fatalf("expected use of closed network connection error, got %s", err)
+	}
+	// Verify second close fails.
+	if err := cn.Close(); err == nil {
+		t.Fatal("expected error")
+	} else if !strings.Contains(err.Error(), "use of closed network connection") {
+		t.Fatalf("expected use of closed network connection error, got %s", err)
 	}
 }
 
