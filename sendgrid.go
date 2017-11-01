@@ -370,20 +370,19 @@ func ShopProductSearchIds(unsanitizedTerm string, limit int) (total int, ids []i
 	}
 
 	query := sanitize(unsanitizedTerm)
-	var (
-		finalSaleId  int
-		finalSaleIds []int = []int{}
-	)
-	if err = dbx.Get(&finalSaleId, "SELECT id FROM categories WHERE system_name = 'final-sale' LIMIT 1"); err != sql.ErrNoRows {
+	var finalSaleIds []int = []int{}
+
+	request = heredoc.Docf(`
+		 SELECT "shop_products"."id"
+		 FROM "shop_products"
+		 INNER JOIN "shop_products_sub_categories" ON "shop_products"."id" = "shop_products_sub_categories"."product_id"
+		 WHERE "shop_products_sub_categories"."sub_category_id" IN
+			 (SELECT  "sub_categories".id FROM "sub_categories" WHERE "sub_categories"."system_name" = 'final-sale')
+		`)
+	if err = dbx.Select(&finalSaleIds, request); err != nil {
 		return
 	}
-	if finalSaleId != 0 {
-		// TODO
-		// subtree_ids := []int{}
-		// SELECT "categories"."id" FROM "categories" WHERE (("categories"."ancestry" ILIKE '66/2/%' OR "categories"."ancestry" = '66/2') OR "categories"."id" = 2)
-		// SELECT "sub_categories"."id" FROM "sub_categories" INNER JOIN "categories_sub_categories" ON "categories_sub_categories"."sub_category_id" = "sub_categories"."id" INNER JOIN "categories" ON "categories"."id" = "categories_sub_categories"."category_id" WHERE "categories"."id" IN (2, 3)
-		// SELECT DISTINCT "shop_products"."id" FROM "shop_products" INNER JOIN "shop_products_sub_categories" ON "shop_products_sub_categories"."product_id" = "shop_products"."id" INNER JOIN "sub_categories" ON "sub_categories"."id" = "shop_products_sub_categories"."sub_category_id" WHERE "sub_categories"."id" IN (4, 7, 3, 5, 6, 8, 235, 465, 466)
-	} else {
+	if len(finalSaleIds) == 0 {
 		finalSaleIds = []int{0}
 	}
 
@@ -409,7 +408,6 @@ func ShopProductSearchIds(unsanitizedTerm string, limit int) (total int, ids []i
       ORDER BY pg_search_rank DESC
 	  %s
 	`, query, query, arrayToString(finalSaleIds, ","), query, query, limitQ)
-
 	type Results struct {
 		Id             string `db:"id"`
 		QuantityBought string `db:"quantity_bought"`
