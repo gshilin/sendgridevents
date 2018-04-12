@@ -259,11 +259,6 @@ func filterShopProducts(ids []int) (result SearchSuggestions) {
 	for i, p := range ids {
 		order = append(order, fmt.Sprintf("(%d,%d)", p, i))
 	}
-	if len(adults) != 0 {
-		adults = fmt.Sprintf(" AND (%s)", adults)
-	} else {
-		adults = ""
-	}
 	request := heredoc.Docf(`
 		SELECT '{"href":"/shop/sales/' || "shop_products".sale_id || '/products/' || "shop_products"."id" || '","label":"' || "shop_products"."title" || '"}' field
 		FROM "shop_products"
@@ -288,11 +283,6 @@ func filterCoupons(ids []int) (result SearchSuggestions) {
 
 	for i, p := range ids {
 		order = append(order, fmt.Sprintf("(%d,%d)", p, i))
-	}
-	if len(adults) != 0 {
-		adults = fmt.Sprintf(" AND (%s)", adults)
-	} else {
-		adults = ""
 	}
 	request := heredoc.Docf(`
 		SELECT '{"href":"/products/' || "products"."system_name" || '","label":"' || "products"."title" || '"}' field
