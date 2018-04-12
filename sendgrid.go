@@ -285,15 +285,20 @@ func filterCoupons(ids []int) (result SearchSuggestions) {
 	for i, p := range ids {
 		order = append(order, fmt.Sprintf("(%d,%d)", p, i))
 	}
+	if len(adults) != 0 {
+		adults = fmt.Sprintf(" AND (%s)", adults)
+	} else {
+		adults = ""
+	}
 	request := heredoc.Docf(`
 		SELECT '{"href":"/products/' || "products"."system_name" || '","label":"' || "products"."title" || '"}' field
 		FROM "products"
 		JOIN (values %s) AS x(id, ordering) ON "products".id = x.id
-		WHERE "products"."id" IN (%s) AND (%s)
+		WHERE "products"."id" IN (%s) %s
 		ORDER BY x.ordering
 	`, strings.Join(order, ","), arrayToString(ids, ","), adults)
 
-	log.Printf("filterCoupons: %s\n", request)
+	log.Printf("filterCoupons: %s\nadults: %s\n", request, adults)
 	if err = dbx.Select(&result, request); err != nil && err != sql.ErrNoRows {
 		result = SearchSuggestions{}
 		return
