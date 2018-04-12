@@ -293,6 +293,7 @@ func filterCoupons(ids []int) (result SearchSuggestions) {
 		ORDER BY x.ordering
 	`, strings.Join(order, ","), arrayToString(ids, ","), adults)
 
+	log.Printf("filterCoupons: %s\n", request)
 	if err = dbx.Select(&result, request); err != nil && err != sql.ErrNoRows {
 		result = SearchSuggestions{}
 		return
