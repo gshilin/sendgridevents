@@ -164,6 +164,9 @@ func processSearchSuggestion(c *gin.Context) {
 	couponsTotal, couponIds := ProductSearchIds(query, 3, false)
 	vacationsTotal, vacationIds := ProductSearchIds(query, 3, true)
 	productsTotal, productIds := ShopProductSearchIds(query, 6)
+	log.Printf("CouponsTotal: %d\n", couponsTotal)
+	log.Printf("vacationsTotal: %d\n", vacationsTotal)
+	log.Printf("productsTotal: %d\n", productsTotal)
 
 	var suggestions []string
 
