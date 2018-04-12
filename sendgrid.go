@@ -211,6 +211,7 @@ func getAO(prefix string) (result string) {
 		FROM "categories"
 		WHERE (("categories"."ancestry" ILIKE '%s/%d/%%' OR "categories"."ancestry" = '%s/%d') OR "categories"."id" = %d) AND "categories"."is_active" = true
 	`, adultsOnlyCategory.Ancestry, adultsOnlyCategory.Id, adultsOnlyCategory.Ancestry, adultsOnlyCategory.Id, adultsOnlyCategory.Id)
+	fmt.Printf("adultsOnlyCategory: %s", request)
 	if err = dbx.Select(&adultsOnlyCatIds, request); err != nil {
 		return
 	}
@@ -223,6 +224,7 @@ func getAO(prefix string) (result string) {
 		INNER JOIN "categories_sub_categories" ON "sub_categories"."id" = "categories_sub_categories"."sub_category_id"
 		WHERE "categories_sub_categories"."category_id" IN (%s)  ORDER BY categories_sub_categories.priority
 	`, arrayToString(adultsOnlySubCatIds, ","))
+	fmt.Printf("adultsOnlySubCatIds: %s", request)
 	if err = dbx.Select(&adultsOnlyCatIds, request); err != nil {
 		return
 	}
@@ -237,15 +239,20 @@ func getAO(prefix string) (result string) {
 	if err = dbx.Select(&productSubCatIds, request); err != nil && err != sql.ErrNoRows {
 		return
 	}
+	fmt.Printf("productSubCatIds: %s", request)
 	if len(productSubCatIds) > 0 {
 		var pairs []int
 		for _, x := range productSubCatIds {
 			pairs = append(pairs, x.Id)
 		}
+		fmt.Printf("AO: %s", heredoc.Docf(`
+			"%sproducts"."id" NOT IN (%s)
+		`, prefix, arrayToString(pairs, ",")))
 		return heredoc.Docf(`
 			"%sproducts"."id" NOT IN (%s)
 		`, prefix, arrayToString(pairs, ","))
 	} else {
+		fmt.Printf("Nothing found")
 		return
 	}
 }
