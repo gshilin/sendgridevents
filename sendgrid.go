@@ -164,9 +164,6 @@ func processSearchSuggestion(c *gin.Context) {
 	couponsTotal, couponIds := ProductSearchIds(query, 3, false)
 	vacationsTotal, vacationIds := ProductSearchIds(query, 3, true)
 	productsTotal, productIds := ShopProductSearchIds(query, 6)
-	log.Printf("CouponsTotal: %d\n", couponsTotal)
-	log.Printf("vacationsTotal: %d\n", vacationsTotal)
-	log.Printf("productsTotal: %d\n", productsTotal)
 
 	var suggestions []string
 
@@ -204,6 +201,8 @@ func getAO(prefix string) (result string) {
 		productsOnlySubCatIds []int
 		productSubCatIds      []AOIds
 	)
+	result = "1=1"
+
 	if err = dbx.Get(&adultsOnlyCategory, `SELECT "categories".id, "categories".ancestry FROM "categories" WHERE "categories".system_name = 'adults-only' LIMIT 1`); err != nil {
 		return
 	}
@@ -247,7 +246,7 @@ func getAO(prefix string) (result string) {
 			"%sproducts"."id" NOT IN (%s)
 		`, prefix, arrayToString(pairs, ","))
 	} else {
-		return "1=1"
+		return
 	}
 }
 
@@ -259,6 +258,11 @@ func filterShopProducts(ids []int) (result SearchSuggestions) {
 
 	for i, p := range ids {
 		order = append(order, fmt.Sprintf("(%d,%d)", p, i))
+	}
+	if len(adults) != 0 {
+		adults = fmt.Sprintf(" AND (%s)", adults)
+	} else {
+		adults = ""
 	}
 	request := heredoc.Docf(`
 		SELECT '{"href":"/shop/sales/' || "shop_products".sale_id || '/products/' || "shop_products"."id" || '","label":"' || "shop_products"."title" || '"}' field
@@ -298,7 +302,6 @@ func filterCoupons(ids []int) (result SearchSuggestions) {
 		ORDER BY x.ordering
 	`, strings.Join(order, ","), arrayToString(ids, ","), adults)
 
-	log.Printf("filterCoupons: %s\nadults: %s\n", request, adults)
 	if err = dbx.Select(&result, request); err != nil && err != sql.ErrNoRows {
 		result = SearchSuggestions{}
 		return
