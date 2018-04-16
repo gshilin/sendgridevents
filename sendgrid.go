@@ -266,7 +266,7 @@ func filterShopProducts(ids []int) (result SearchSuggestions) {
 		SELECT '{"href":"/shop/sales/' || "shop_products".sale_id || '/products/' || "shop_products"."id" || '","label":"' || "shop_products"."title" || '"}' field
 		FROM "shop_products"
 		JOIN (values %s) AS x(id, ordering) ON "shop_products".id = x.id
-		WHERE "shop_products"."id" IN (%s) AND (%s)
+		WHERE "shop_products"."id" IN (%s) %s
 		ORDER BY x.ordering
 	`, strings.Join(order, ","), arrayToString(ids, ","), adults)
 
