@@ -19,6 +19,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"strings"
 	"regexp"
+	"encoding/json"
 )
 
 type Event struct {
@@ -154,7 +155,7 @@ func processEvent(c *gin.Context) {
 }
 
 func processSearchSuggestion(c *gin.Context) {
-	c.Writer.Header().Set("Content-Type", "application/json")
+	c.Writer.Header().Set("Content-Type", "application/res")
 
 	query := c.DefaultQuery("term", "")
 	if query == "" {
@@ -166,26 +167,38 @@ func processSearchSuggestion(c *gin.Context) {
 	vacationsTotal, vacationIds := ProductSearchIds(query, 3, true)
 	productsTotal, productIds := ShopProductSearchIds(query, 6)
 
-	var suggestions []string
+	var res []string
 
 	if couponsTotal > 0 {
 		for _, x := range filterCoupons(couponIds) {
-			suggestions = append(suggestions, x.Field)
+			res = append(res, x.Field)
 		}
 	}
 	if vacationsTotal > 0 {
 		for _, x := range filterCoupons(vacationIds) {
-			suggestions = append(suggestions, x.Field)
+			res = append(res, x.Field)
 		}
 	}
 	if productsTotal > 0 {
 		for _, x := range filterShopProducts(productIds) {
-			suggestions = append(suggestions, x.Field)
+			res = append(res, x.Field)
 		}
 	}
 
+	type Suggestion struct {
+		Href string `json:"href"`
+		Label string `json:"label"`
+	}
+	var suggestion Suggestion
+	var suggestions []string
 	re := regexp.MustCompile("(?i)" + query)
-	c.String(http.StatusOK, "[%s]", re.ReplaceAllString(strings.Join(suggestions, ","), "<b style='background: yellow;'>" + query + "</b>"))
+	for _, x := range res {
+		json.Unmarshal([]byte(x), &suggestion)
+		suggestion.Label = re.ReplaceAllString(suggestion.Label, "<b style='background: yellow;'>" + query + "</b>")
+		j, _ := json.Marshal(suggestion)
+		suggestions = append(suggestions, string(j))
+	}
+	c.String(http.StatusOK, "[%s]", strings.Join(suggestions, ","))
 }
 
 func getAO(prefix string) (result string) {
