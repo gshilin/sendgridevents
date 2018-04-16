@@ -185,7 +185,7 @@ func processSearchSuggestion(c *gin.Context) {
 	}
 
 	re := regexp.MustCompile("(?i)" + query)
-	c.String(http.StatusOK, "[%s]", re.ReplaceAllString(strings.Join(suggestions, ","), "<b style='color: red;'>" + query + "</b>"))
+	c.String(http.StatusOK, "[%s]", re.ReplaceAllString(strings.Join(suggestions, ","), "<b style='background: yellow;'>" + query + "</b>"))
 }
 
 func getAO(prefix string) (result string) {
