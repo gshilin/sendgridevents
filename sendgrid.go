@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"github.com/jmoiron/sqlx"
 	"strings"
+	"regexp"
 )
 
 type Event struct {
@@ -183,7 +184,8 @@ func processSearchSuggestion(c *gin.Context) {
 		}
 	}
 
-	c.String(http.StatusOK, "[%s]", strings.Join(suggestions, ","))
+	re := regexp.MustCompile("(?i)" + query)
+	c.String(http.StatusOK, "[%s]", re.ReplaceAllString(strings.Join(suggestions, ","), "<b style='color: red;'>" + query + "</b>"))
 }
 
 func getAO(prefix string) (result string) {
