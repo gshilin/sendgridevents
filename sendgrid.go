@@ -201,7 +201,7 @@ func getAO(prefix string) (result string) {
 		productsOnlySubCatIds []int
 		productSubCatIds      []AOIds
 	)
-	result = "1=1"
+	result = "AND 1=1"
 
 	if err = dbx.Get(&adultsOnlyCategory, `SELECT "categories".id, "categories".ancestry FROM "categories" WHERE "categories".system_name = 'adults-only' LIMIT 1`); err != nil {
 		return
