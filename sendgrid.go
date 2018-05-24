@@ -332,7 +332,7 @@ func ProductSearchIds(unsanitizedTerm string, limit int, vacation bool) (total i
 	if len(unsanitizedTerm) == 0 {
 		request = heredoc.Docf(`
 			WITH coupons AS (
-				SELECT DISTINCT *
+				SELECT *
 				FROM products
 				WHERE ready = 't' AND visible = 't' AND LOCALTIMESTAMP BETWEEN valid_from AND valid_until
 				AND vacation = '%s'
@@ -346,7 +346,7 @@ func ProductSearchIds(unsanitizedTerm string, limit int, vacation bool) (total i
 		term := sanitize(unsanitizedTerm)
 		request = heredoc.Docf(`
 	      WITH coupons AS (
-			SELECT DISTINCT *, ((ts_rank(("products"."tsv"), (to_tsquery('simple', ''' ' || '%s' || ' ''' || ':*')), 0))) AS pg_search_rank
+			SELECT *, ((ts_rank(("products"."tsv"), (to_tsquery('simple', ''' ' || '%s' || ' ''' || ':*')), 0))) AS pg_search_rank
 			FROM products
 			WHERE ready = 't' AND visible = 't' AND LOCALTIMESTAMP BETWEEN valid_from AND valid_until
 				AND vacation = '%s'
